@@ -14,6 +14,7 @@ import javax.security.cert.CertificateParsingException;
 
 
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.*;
@@ -33,42 +34,60 @@ public class RenewUltimateCA {
         PublicKey caPubKey;
         String strPrivateJavaHome = "";
 
-        KeyStore caks = KeyStore.getInstance("JKS");
-        //        String javaHome = System.getProperty("java.home");
-        String strPrivateCAStore = strPrivateJavaHome + "/lib/security/cacerts";
-        caks.load(new FileInputStream(strPrivateCAStore), "changeit".toCharArray());
+        try {
+            KeyStore caks = KeyStore.getInstance("JKS");
+            //        String javaHome = System.getProperty("java.home");
+            String strPrivateCAStore = strPrivateJavaHome + "/lib/security/cacerts";
 
-        caDUALCert = caks.getCertificate("dualultimateca");
-        caPrivKey = (PrivateKey) caks.getKey("dualultimateca", "changeit".toCharArray());
-        caPubKey = caDUALCert.getPublicKey();
+            FileInputStream bIn = new FileInputStream(strPrivateCAStore);
+            caks.load(bIn, "changeit".toCharArray());
+            bIn.close();
 
-        X509Certificate cert = (X509Certificate)caDUALCert;
-        // this is a correct CA cert
-        if(cert.getBasicConstraints() < 0)
-            return;
+            caDUALCert = caks.getCertificate("dualultimateca");
+            caPrivKey = (PrivateKey) caks.getKey("dualultimateca", "changeit".toCharArray());
+            caPubKey = caDUALCert.getPublicKey();
 
-        cert.getIssuerDN()
+            X509Certificate cert = (X509Certificate) caDUALCert;
+            // this is a correct CA cert
+            if (cert.getBasicConstraints() < 0)
+                return;
 
-        final Instant now = Instant.now();
-        final Date notBefore = Date.from(now);
-        final Date notAfter = Date.from(now.plus(Duration.ofDays(days)));
 
-        //Use appropriate signature algorithm based on your keyPair algorithm
-        final ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA").build(caPrivKey);
-        final X500Name x500Name = getSubjectX500Name(cert);
-        final X509v3CertificateBuilder certificateBuilder =
-                new JcaX509v3CertificateBuilder(x500Name,
-                        BigInteger.valueOf(now.toEpochMilli()),
-                        notBefore,
-                        notAfter,
-                        x500Name,
-                        caPubKey)
- //                       .addExtension(Extension.subjectKeyIdentifier, false, createSubjectKeyId(caPubKey))
- //                       .addExtension(Extension.authorityKeyIdentifier, false, createAuthorityKeyId(caPubKey))
-                        .addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
+            String algName = cert.getSigAlgName();
+            //Use appropriate signature algorithm based on your keyPair algorithm
+            final ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA").build(caPrivKey);
+            final X500Name x500Name = getSubjectX500Name(cert);
+            final X509v3CertificateBuilder certificateBuilder =
+                    new JcaX509v3CertificateBuilder(x500Name,
+                            cert.getSerialNumber(),
+                            cert.getNotBefore(),
+                            cert.getNotAfter(),
+                            x500Name,
+                            caPubKey)
+                            //                       .addExtension(Extension.subjectKeyIdentifier, false, createSubjectKeyId(caPubKey))
+                            //                       .addExtension(Extension.authorityKeyIdentifier, false, createAuthorityKeyId(caPubKey))
+                            .addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
 
-        return new JcaX509CertificateConverter()
-                .setProvider(new BouncyCastleProvider()).getCertificate(certificateBuilder.build(contentSigner));
+            //new cert
+            cert = new JcaX509CertificateConverter()
+                    .setProvider(new BouncyCastleProvider()).getCertificate(certificateBuilder.build(contentSigner));
+
+
+            // set the entries
+            //        caCerts.setCertificateEntry("DUAL Ultimate", cert);
+            Certificate[] chain = new Certificate[1];
+            chain[0] = cert;
+
+            caks.setKeyEntry("dualultimateca", caPrivKey, "changeit".toCharArray(), chain);
+
+            //replace the old one in cacerts
+            FileOutputStream bOut = new FileOutputStream(strPrivateCAStore);
+            caks.store(bOut, "changeit".toCharArray());
+            bOut.close();
+        }
+        catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
     }
 
 
@@ -81,109 +100,6 @@ public class RenewUltimateCA {
             return new X500Name(subjectX500.getName(X500Principal.RFC1779));
         }
     }
-
-
-    public static Certificate selfSign(KeyPair keyPair, String subjectDN) throws OperatorCreationException, CertificateException, IOException
-    {
-        Provider bcProvider = new BouncyCastleProvider();
-        Security.addProvider(bcProvider);
-
-        long now = System.currentTimeMillis();
-        Date startDate = new Date(now);
-
-        X500Name dnName = new X500Name(subjectDN);
-        BigInteger certSerialNumber = new BigInteger(Long.toString(now)); // <-- Using the current timestamp as the certificate serial number
-
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(startDate);
-        calendar.add(Calendar.YEAR, 1); // <-- 1 Yr validity
-
-        Date endDate = calendar.getTime();
-
-        String signatureAlgorithm = "SHA256WithRSA"; // <-- Use appropriate signature algorithm based on your keyPair algorithm.
-
-        ContentSigner contentSigner = new JcaContentSignerBuilder(signatureAlgorithm).build(keyPair.getPrivate());
-
-        JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(dnName, certSerialNumber, startDate, endDate, dnName, keyPair.getPublic());
-
-        // Extensions --------------------------
-
-
-
-        // -------------------------------------
-
-        return new JcaX509CertificateConverter().setProvider(bcProvider).getCertificate(certBuilder.build(contentSigner));
-    }
-
-    public static boolean createMasterCert(String strPrivateJavaHome,  String strSeed,    PublicKey       pubKey,
-                                           PrivateKey      privKey)
-    {
-        boolean bret = true;
-        try
-        {
-            X509V3CertificateGenerator v3CertGen2 = new X509V3CertificateGenerator();
-            //
-            // signers name
-            //
-            String  issuer = "C=UK, O=Deepnet Security, OU=" + strSeed;
-
-            //
-            // subjects name - the same as we are self signed.
-            //
-            String  subject = issuer;
-
-            //
-            // create the certificate - version 1
-            //
-
-            v3CertGen2.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
-            v3CertGen2.setIssuerDN(new X509Principal(issuer));
-            v3CertGen2.setNotBefore(new Date(System.currentTimeMillis() - 1000L * 60 * 60 * 24 * 30));	// one month
-            v3CertGen2.setNotAfter(new Date(System.currentTimeMillis() + (1000L * 60 * 60 * 24 * 30 * 1200 ))); // 10 years
-            v3CertGen2.setSubjectDN(new X509Principal(subject));
-            v3CertGen2.setPublicKey(pubKey);
-            v3CertGen2.setSignatureAlgorithm("SHA256WithRSAEncryption");
-
-            v3CertGen2.addExtension(
-                    org.bouncycastle.asn1.x509.X509Extensions.BasicConstraints,
-                    true,
-                    new org.bouncycastle.asn1.x509.BasicConstraints(true)
-            );
-
-            //       X509Certificate cert = v1CertGen.generateX509Certificate(privKey);
-            X509Certificate cert = v3CertGen2.generate(privKey,"BC");
-
-            cert.checkValidity(new Date());
-
-            cert.verify(pubKey);
-
-            //		now write it to cacerts store
-            KeyStore caCerts = KeyStore.getInstance("JKS");
-            //        String javaHome = System.getProperty("java.home");
-            String strPrivateCAStore = strPrivateJavaHome + "/lib/security/cacerts";
-            caCerts.load(new FileInputStream(strPrivateCAStore),
-                    "changeit".toCharArray());
-
-            // set the entries
-            //        caCerts.setCertificateEntry("DUAL Ultimate", cert);
-            Certificate[] chain = new Certificate[1];
-            chain[0] = cert;
-
-            caCerts.setKeyEntry("dualultimateca", privKey, "changeit".toCharArray(), chain);
-
-            FileOutputStream bOut = new FileOutputStream(strPrivateCAStore);
-            caCerts.store(bOut, "changeit".toCharArray());
-            bOut.close();
-        }
-        catch(Exception e)
-        {
-            e.printStackTrace();
-            bret = false;
-        }
-
-        return bret;
-    }
-
 
 
 }
