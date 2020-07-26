@@ -93,6 +93,26 @@ public class RenewUltimateCA {
         }
     }
 
+    /*
+    https://stackoverflow.com/questions/7567837/attributes-reversed-in-certificate-subject-and-issuer
+     //create a X500Name (bouncy) from a X500Principal (SUN)
+     */
+    private static X500Name toBouncyX500Name( javax.security.auth.x500.X500Principal principal) {
+
+        String name = principal.getName();
+
+        String[] RDN = name.split(",");
+
+        StringBuffer buf = new StringBuffer(name.length());
+        for(int i = RDN.length - 1; i >= 0; i--){
+            if(i != RDN.length - 1)
+                buf.append(',');
+
+            buf.append(RDN[i]);
+        }
+
+        return new X500Name(buf.toString());
+    }
 
     public static X500Name getSubjectX500Name(X509Certificate cert) {
         Principal subjectDN = cert.getSubjectDN();
@@ -100,7 +120,8 @@ public class RenewUltimateCA {
             return (X500Name)subjectDN;
         } else {
             X500Principal subjectX500 = cert.getSubjectX500Principal();
-            return new X500Name(subjectX500.getName(X500Principal.RFC1779));
+            return toBouncyX500Name(subjectX500);
+            //return new X500Name(subjectX500.getName(X500Principal.RFC2253));    // we use RFC2253 order
         }
     }
 
