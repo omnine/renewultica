@@ -1,8 +1,10 @@
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentSigner;
@@ -37,7 +39,10 @@ public class RenewUltimateCA {
             caks.load(bIn, "changeit".toCharArray());
             bIn.close();
 
-            caDUALCert = caks.getCertificate("dualultimateca");
+            X509Certificate cert = (X509Certificate) caks.getCertificate("dualultimateca");
+            // this is a correct CA cert
+            if (cert.getBasicConstraints() >= 0)
+                return;
 /*
             KeyStore.PrivateKeyEntry privateKey = (KeyStore.PrivateKeyEntry) caks.getEntry(
                     "dualultimateca", new KeyStore.PasswordProtection("".toCharArray()));
@@ -45,18 +50,14 @@ public class RenewUltimateCA {
 */
             // key has no password
             caPrivKey = (PrivateKey) caks.getKey("dualultimateca", "".toCharArray());
-            caPubKey = caDUALCert.getPublicKey();
-
-            X509Certificate cert = (X509Certificate) caDUALCert;
-            // this is a correct CA cert
-            if (cert.getBasicConstraints() >= 0)
-                return;
+            caPubKey = cert.getPublicKey();
 
 
             String algName = cert.getSigAlgName();
             //Use appropriate signature algorithm based on your keyPair algorithm
             final ContentSigner contentSigner = new JcaContentSignerBuilder(algName).build(caPrivKey);
             final X500Name x500Name = getSubjectX500Name(cert);
+            JcaX509ExtensionUtils extensionUtils = new JcaX509ExtensionUtils();
             final X509v3CertificateBuilder certificateBuilder =
                     new JcaX509v3CertificateBuilder(x500Name,
                             cert.getSerialNumber(),
@@ -64,8 +65,10 @@ public class RenewUltimateCA {
                             cert.getNotAfter(),
                             x500Name,
                             caPubKey)
-                            //                       .addExtension(Extension.subjectKeyIdentifier, false, createSubjectKeyId(caPubKey))
-                            //                       .addExtension(Extension.authorityKeyIdentifier, false, createAuthorityKeyId(caPubKey))
+
+                            .addExtension(Extension.subjectKeyIdentifier, false, extensionUtils.createSubjectKeyIdentifier(caPubKey))
+                            .addExtension(Extension.authorityKeyIdentifier, false, extensionUtils.createAuthorityKeyIdentifier(caPubKey))
+                            .addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign | KeyUsage.digitalSignature))
                             .addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
 
             //new cert
