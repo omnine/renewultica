@@ -7,22 +7,15 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 import javax.security.auth.x500.X500Principal;
-import javax.security.cert.CertificateParsingException;
 
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
 
 public class RenewUltimateCA {
     public static void main(String[] args) {
@@ -37,25 +30,32 @@ public class RenewUltimateCA {
         try {
             KeyStore caks = KeyStore.getInstance("JKS");
             //        String javaHome = System.getProperty("java.home");
-            String strPrivateCAStore = strPrivateJavaHome + "/lib/security/cacerts";
+            //String strPrivateCAStore = strPrivateJavaHome + "/lib/security/cacerts";
+            String strPrivateCAStore = "cacerts";
 
             FileInputStream bIn = new FileInputStream(strPrivateCAStore);
             caks.load(bIn, "changeit".toCharArray());
             bIn.close();
 
             caDUALCert = caks.getCertificate("dualultimateca");
-            caPrivKey = (PrivateKey) caks.getKey("dualultimateca", "changeit".toCharArray());
+/*
+            KeyStore.PrivateKeyEntry privateKey = (KeyStore.PrivateKeyEntry) caks.getEntry(
+                    "dualultimateca", new KeyStore.PasswordProtection("".toCharArray()));
+            caPrivKey = privateKey.getPrivateKey();
+*/
+            // key has no password
+            caPrivKey = (PrivateKey) caks.getKey("dualultimateca", "".toCharArray());
             caPubKey = caDUALCert.getPublicKey();
 
             X509Certificate cert = (X509Certificate) caDUALCert;
             // this is a correct CA cert
-            if (cert.getBasicConstraints() < 0)
+            if (cert.getBasicConstraints() >= 0)
                 return;
 
 
             String algName = cert.getSigAlgName();
             //Use appropriate signature algorithm based on your keyPair algorithm
-            final ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA").build(caPrivKey);
+            final ContentSigner contentSigner = new JcaContentSignerBuilder(algName).build(caPrivKey);
             final X500Name x500Name = getSubjectX500Name(cert);
             final X509v3CertificateBuilder certificateBuilder =
                     new JcaX509v3CertificateBuilder(x500Name,
