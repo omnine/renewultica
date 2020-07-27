@@ -13,6 +13,7 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import javax.security.auth.x500.X500Principal;
 
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.security.*;
@@ -23,26 +24,48 @@ public class RenewUltimateCA {
     public static void main(String[] args) {
         System.out.println("Hello World !!");
 
-        //get CA cert, private key and publick key first
-        Certificate caDUALCert;
+        //get CA cert, private key and public key first
         PrivateKey caPrivKey;
         PublicKey caPubKey;
-        String strPrivateJavaHome = "";
 
         try {
-            KeyStore caks = KeyStore.getInstance("JKS");
-            //        String javaHome = System.getProperty("java.home");
-            //String strPrivateCAStore = strPrivateJavaHome + "/lib/security/cacerts";
-            String strPrivateCAStore = "cacerts";
+
+            String strPrivateCAStore = "";
+
+            if (args.length > 0) {
+                //specify the folder
+                strPrivateCAStore = args[0] + "/cacerts";
+            }
+            else {
+                String javaHome = System.getProperty("java.home");
+                strPrivateCAStore = javaHome + "/lib/security/cacerts";
+            }
+
+            File f = new File(strPrivateCAStore);
+            if(!f.exists()) {
+                System.out.println("File " + strPrivateCAStore + " does not exist!");
+                return;
+            }
+
+
+            System.out.println("Try to update one certificate in " + strPrivateCAStore);
 
             FileInputStream bIn = new FileInputStream(strPrivateCAStore);
+
+            KeyStore caks = KeyStore.getInstance("JKS");
             caks.load(bIn, "changeit".toCharArray());
             bIn.close();
 
             X509Certificate cert = (X509Certificate) caks.getCertificate("dualultimateca");
-            // this is a correct CA cert
-            if (cert.getBasicConstraints() >= 0)
+            if(cert == null) {
+                System.out.println("The certificate with alias dualultimateca does not exist!");
                 return;
+            }
+            // this is a correct CA cert
+            if (cert.getBasicConstraints() >= 0) {
+                System.out.println("Not Necessary to update it");
+                return;
+            }
 /*
             KeyStore.PrivateKeyEntry privateKey = (KeyStore.PrivateKeyEntry) caks.getEntry(
                     "dualultimateca", new KeyStore.PasswordProtection("".toCharArray()));
