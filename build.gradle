@@ -25,7 +25,7 @@ jar {
     exclude('META-INF/BC*')
 
     manifest {
-        attributes ('Main-Class': 'RenewUltimateCA')
+        attributes ('Main-Class': 'com.deepnet.serverupgrade.RenewUltimateCA')
     }
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
