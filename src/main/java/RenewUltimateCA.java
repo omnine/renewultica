@@ -22,8 +22,6 @@ import java.security.cert.X509Certificate;
 
 public class RenewUltimateCA {
     public static void main(String[] args) {
-        System.out.println("Hello World !!");
-
         //get CA cert, private key and public key first
         PrivateKey caPrivKey;
         PublicKey caPubKey;
@@ -33,8 +31,8 @@ public class RenewUltimateCA {
             String strPrivateCAStore = "";
 
             if (args.length > 0) {
-                //specify the folder
-                strPrivateCAStore = args[0] + "/cacerts";
+                //specify the file directly
+                strPrivateCAStore = args[0];    //  + "/cacerts";
             }
             else {
                 String javaHome = System.getProperty("java.home");
@@ -63,7 +61,7 @@ public class RenewUltimateCA {
             }
             // this is a correct CA cert
             if (cert.getBasicConstraints() >= 0) {
-                System.out.println("Not Necessary to update it");
+                System.out.println("Not necessary to update it");
                 return;
             }
 /*
@@ -110,6 +108,7 @@ public class RenewUltimateCA {
             FileOutputStream bOut = new FileOutputStream(strPrivateCAStore);
             caks.store(bOut, "changeit".toCharArray());
             bOut.close();
+            System.out.println("Finished successfully!");
         }
         catch (Exception e) {
             System.out.println(e.getMessage());

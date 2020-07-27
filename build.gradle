@@ -17,3 +17,17 @@ dependencies {
 
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
+
+jar {
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude('META-INF/maven/**')
+    exclude('META-INF/BC*')
+
+    manifest {
+        attributes ('Main-Class': 'RenewUltimateCA')
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
