@@ -1,6 +1,6 @@
 # Purpose
 
-to fix a ill-formatted self-signed CA certificate which missed basic constraint.
+To fix an ill-formatted self-signed CA certificate which missed an extension called basic constraint.
 
 # How to run 
 
